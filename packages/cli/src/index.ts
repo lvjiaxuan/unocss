@@ -1,4 +1,4 @@
-import { existsSync, promises as fs } from 'node:fs'
+import { existsSync, promises as fs, mkdirSync } from 'node:fs'
 import process from 'node:process'
 import { basename, dirname, normalize, relative, resolve } from 'pathe'
 import fg from 'fast-glob'
@@ -117,14 +117,36 @@ export async function build(_options: CliOptions) {
     const defaultTransform = await transformFiles(preTransform)
     const postTransform = await transformFiles(defaultTransform, 'post')
 
-    // update source file
-    if (options.writeTransformed) {
+    const { writeTransformed, outTransformed } = options
+
+    if (writeTransformed || outTransformed) {
       await Promise.all(
         postTransform
           .filter(({ transformedCode }) => !!transformedCode)
-          .map(({ transformedCode, id }) => new Promise<void>((resolve) => {
-            if (existsSync(id))
-              fs.writeFile(id, transformedCode as string, 'utf-8').then(resolve)
+          .map(({ transformedCode, id }) => new Promise<void[]>((_resolve) => {
+            const promises: Array<Promise<void>> = []
+
+            // output transformed files
+            let outTransformedDir: string | undefined
+            if (typeof outTransformed === 'string')
+              outTransformedDir = resolve(cwd, outTransformed)
+            else if (outTransformed === true)
+              outTransformedDir = resolve(cwd, 'uno-transformed')
+
+            if (outTransformedDir) {
+              if (!existsSync(outTransformedDir))
+                mkdirSync(outTransformedDir, { recursive: true })
+
+              const fileName = basename(id)
+              const writeFile = resolve(outTransformedDir, fileName)
+              promises.push(fs.writeFile(writeFile, transformedCode as string, 'utf-8'))
+            }
+
+            // update source file
+            if (writeTransformed && existsSync(id))
+              promises.push(fs.writeFile(id, transformedCode as string, 'utf-8'))
+
+            Promise.all(promises).then(_resolve)
           })),
       )
     }
