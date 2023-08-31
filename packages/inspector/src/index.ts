@@ -3,8 +3,11 @@ import { fileURLToPath } from 'node:url'
 import sirv from 'sirv'
 import type { Plugin, ViteDevServer } from 'vite'
 import type { UnocssPluginContext } from '@unocss/core'
+import { BetterMap, CountableSet } from '@unocss/core'
 import gzipSize from 'gzip-size'
-import type { ModuleInfo, ProjectInfo } from '../types'
+import type { ModuleInfo, OverviewInfo, ProjectInfo } from '../types'
+import { SKIP_COMMENT_RE } from '../../shared-integration/src/constants'
+import { analyzer } from './analyzer'
 
 const _dirname = typeof __dirname !== 'undefined'
   ? __dirname
@@ -32,7 +35,7 @@ export default function UnocssInspector(ctx: UnocssPluginContext): Plugin {
           configSources: (await ctx.ready).sources,
         }
         res.setHeader('Content-Type', 'application/json')
-        res.write(JSON.stringify(info, null, 2))
+        res.write(JSON.stringify(info, getCircularReplacer(), 2))
         res.end()
         return
       }
@@ -48,14 +51,19 @@ export default function UnocssInspector(ctx: UnocssPluginContext): Plugin {
           return
         }
 
-        const result = await ctx.uno.generate(code, { id, preflights: false })
+        const tokens = new CountableSet<string>()
+        await ctx.uno.applyExtractors(code.replace(SKIP_COMMENT_RE, ''), id, tokens)
+
+        const result = await ctx.uno.generate(tokens, { id, extendedInfo: true, preflights: false })
+        const analyzed = await analyzer(new BetterMap([[id, code]]), ctx)
         const mod: ModuleInfo = {
           ...result,
-          matched: Array.from(result.matched),
+          ...analyzed,
           gzipSize: await gzipSize(result.css),
           code,
           id,
         }
+
         res.setHeader('Content-Type', 'application/json')
         res.write(JSON.stringify(mod, null, 2))
         res.end()
@@ -79,10 +87,13 @@ export default function UnocssInspector(ctx: UnocssPluginContext): Plugin {
       }
 
       if (req.url.startsWith('/overview')) {
-        const result = await ctx.uno.generate(ctx.tokens)
-        const mod = {
+        const result = await ctx.uno.generate(ctx.tokens, { preflights: false })
+        const analyzed = await analyzer(ctx.modules, ctx)
+
+        const mod: OverviewInfo = {
           ...result,
-          matched: Array.from(result.matched),
+          colors: analyzed.colors.map(s => ({ ...s, modules: [...s.modules] })),
+          matched: analyzed.matched.map(s => ({ ...s, modules: [...s.modules] })),
           gzipSize: await gzipSize(result.css),
         }
         res.setHeader('Content-Type', 'application/json')
@@ -100,4 +111,23 @@ export default function UnocssInspector(ctx: UnocssPluginContext): Plugin {
     apply: 'serve',
     configureServer,
   } as Plugin
+}
+
+function getCircularReplacer() {
+  const ancestors: any = []
+  return function (this: any, key: any, value: any) {
+    if (typeof value !== 'object' || value === null)
+      return value
+
+    // `this` is the object that value is contained in,
+    // i.e., its direct parent.
+    while (ancestors.length > 0 && ancestors.at(-1) !== this)
+      ancestors.pop()
+
+    if (ancestors.includes(value))
+      return '[Circular]'
+
+    ancestors.push(value)
+    return value
+  }
 }

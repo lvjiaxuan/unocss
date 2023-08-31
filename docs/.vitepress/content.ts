@@ -10,6 +10,7 @@ export interface Example {
   name: string
   path: string
   stackblitz?: boolean
+  codesandbox?: boolean
   icon?: string
   icons?: string[]
 }
@@ -101,12 +102,20 @@ export const examples: Example[] = [
     path: 'examples/next',
     icon: 'i-logos-nextjs-icon',
     // stackblitz: true,
+    codesandbox: true,
   },
   {
     name: 'react',
     path: 'examples/react',
     icon: 'i-logos-react',
     stackblitz: true,
+  },
+  {
+    name: 'vite-lightningcss',
+    path: 'examples/vite-lightningcss',
+    icon: 'i-ph-lightning text-yellow',
+    // lightingcss is not supported by stackblitz yet
+    // stackblitz: true,
   },
   {
     name: 'vite-lit',

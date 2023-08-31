@@ -1,16 +1,20 @@
 import type { AutoCompleteExtractorResult, AutoCompleteFunction, AutoCompleteTemplate, SuggestResult, UnoGenerator, Variant } from '@unocss/core'
 import { escapeRegExp, toArray, uniq } from '@unocss/core'
 import { LRUCache } from 'lru-cache'
+import { Fzf, byLengthAsc, byStartAsc } from 'fzf'
 import { parseAutocomplete } from './parse'
-import type { ParsedAutocompleteTemplate, UnocssAutocomplete } from './types'
+import type { AutocompleteOptions, ParsedAutocompleteTemplate, UnocssAutocomplete } from './types'
 import { searchAttrKey, searchUsageBoundary } from './utils'
 
-export function createAutocomplete(uno: UnoGenerator): UnocssAutocomplete {
+export function createAutocomplete(uno: UnoGenerator, options: AutocompleteOptions = {}): UnocssAutocomplete {
   const templateCache = new Map<string, ParsedAutocompleteTemplate>()
   const cache = new LRUCache<string, string[]>({ max: 5000 })
 
   let staticUtils: string[] = []
+
   const templates: (AutoCompleteTemplate | AutoCompleteFunction)[] = []
+
+  const matchType = options.matchType ?? 'prefix'
 
   reset()
 
@@ -52,7 +56,7 @@ export function createAutocomplete(uno: UnoGenerator): UnocssAutocomplete {
 
   function getParsed(template: string) {
     if (!templateCache.has(template))
-      templateCache.set(template, parseAutocomplete(template, uno.config.theme))
+      templateCache.set(template, parseAutocomplete(template, uno.config.theme, uno.config.autocomplete.shorthands))
     return templateCache.get(template)!.suggest
   }
 
@@ -72,7 +76,7 @@ export function createAutocomplete(uno: UnoGenerator): UnocssAutocomplete {
     const variantPrefix = input.slice(0, idx)
     const variantSuffix = input.slice(idx + input.length)
 
-    const result = processSuggestions(
+    let result = processSuggestions(
       await Promise.all([
         suggestSelf(processed),
         suggestStatic(processed),
@@ -84,6 +88,12 @@ export function createAutocomplete(uno: UnoGenerator): UnocssAutocomplete {
       variantSuffix,
     )
 
+    if (matchType === 'fuzzy') {
+      const fzf = new Fzf(result, {
+        tiebreakers: [byStartAsc, byLengthAsc],
+      })
+      result = fzf.find(input).map(i => i.item)
+    }
     cache.set(input, result)
     return result
   }
@@ -133,6 +143,8 @@ export function createAutocomplete(uno: UnoGenerator): UnocssAutocomplete {
   }
 
   async function suggestStatic(input: string) {
+    if (matchType === 'fuzzy')
+      return staticUtils
     return staticUtils.filter(i => i.startsWith(input))
   }
 
@@ -146,7 +158,7 @@ export function createAutocomplete(uno: UnoGenerator): UnocssAutocomplete {
     return templates.map(fn =>
       typeof fn === 'function'
         ? fn(input)
-        : getParsed(fn)(input),
+        : getParsed(fn)(input, matchType),
     ) || []
   }
 
@@ -157,7 +169,7 @@ export function createAutocomplete(uno: UnoGenerator): UnocssAutocomplete {
       .map(fn =>
         typeof fn === 'function'
           ? fn(input)
-          : getParsed(fn)(input),
+          : getParsed(fn)(input, matchType),
       )
   }
 
@@ -180,8 +192,8 @@ export function createAutocomplete(uno: UnoGenerator): UnocssAutocomplete {
     return uniq(suggestions.flat())
       .filter((i): i is string => !!(i && !i.match(/-$/) && !uno.isBlocked(i)))
       .sort((a, b) => {
-        const numA = +(a.match(/\d+$/)?.[0] || NaN)
-        const numB = +(b.match(/\d+$/)?.[0] || NaN)
+        const numA = +(a.match(/\d+$/)?.[0] || Number.NaN)
+        const numB = +(b.match(/\d+$/)?.[0] || Number.NaN)
         if (!Number.isNaN(numA) && !Number.isNaN(numB))
           return numA - numB
         return a.localeCompare(b)

@@ -2,7 +2,7 @@ import type { GenerateResult, ResolvedConfig, StringifiedUtil, UnoGenerator } fr
 
 const mockClasses = ['mb-1', 'mr-1', 'font-bold', 'text-lg', 'text-red-600', 'text-green-600', 'italic']
 
-const utils: StringifiedUtil<{}>[] = mockClasses.map((name, index) => [
+const utils: StringifiedUtil<object>[] = mockClasses.map((name, index) => [
   index,
   name,
   '',
@@ -22,11 +22,15 @@ const config: ResolvedConfig = {
 // @ts-expect-error generator not being fully fleshed out
 export const unoMock: UnoGenerator = {
   config,
-  parseToken: async (token: string) => {
+  async parseToken(token: string) {
     const util = utils.find(([, name]) => name === token)
     if (util)
       return [util]
     return undefined
   },
-  generate: async (selectors: string[]) => { return { css: selectors.join('') } as GenerateResult },
+  async generate(selectors: string[]) {
+    return {
+      css: selectors.join(''),
+    } as GenerateResult<any>
+  },
 }
