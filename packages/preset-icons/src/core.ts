@@ -1,5 +1,5 @@
 import type { CSSObject } from '@unocss/core'
-import { definePreset, warnOnce } from '@unocss/core'
+import { definePreset, notNull, warnOnce } from '@unocss/core'
 import type {
   IconifyLoaderOptions,
   UniversalIconLoader,
@@ -10,6 +10,8 @@ import { loadIcon } from '@iconify/utils/lib/loader/loader'
 import { searchForIcon } from '@iconify/utils/lib/loader/modern'
 import type { IconsOptions } from './types'
 import icons from './collections.json'
+import { resolveQueryString } from './utils'
+import { scaleDuration } from './duration'
 
 const COLLECTION_NAME_PARTS_MAX = 3
 
@@ -67,9 +69,10 @@ export function createPresetIcons(lookupIconLoader: (options: IconsOptions) => P
       options,
       layers: { icons: -30 },
       rules: [[
-        /^([a-z0-9:_-]+)(?:\?(mask|bg|auto))?$/,
+        /^([a-z0-9:_-]+)(?:\?(\S*))?$/,
         async (matcher) => {
-          let [full, body, _mode = mode] = matcher as [string, string, IconsOptions['mode']]
+          const [full, body, queryString] = matcher as [string, string, string]
+          let { mode: _mode = mode, duration } = resolveQueryString(queryString)
           let collection = ''
           let name = ''
           let svg: string | undefined
@@ -96,6 +99,10 @@ export function createPresetIcons(lookupIconLoader: (options: IconsOptions) => P
             if (warn && !flags.isESLint)
               warnOnce(`failed to load icon "${full}"`)
             return
+          }
+
+          if (notNull(duration)) {
+            svg = scaleDuration(svg, duration)
           }
 
           let cssObject: CSSObject
