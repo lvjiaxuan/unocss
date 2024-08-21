@@ -111,7 +111,7 @@ export interface IconsOptions {
   processor?: (cssObject: CSSObject, meta: Required<IconMeta>) => void
 }
 
-export interface QueryObject {
+export interface QueryParams {
   mode?: IconsOptions['mode']
   duration?: number
 }

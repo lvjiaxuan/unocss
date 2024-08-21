@@ -10,7 +10,7 @@ import { loadIcon } from '@iconify/utils/lib/loader/loader'
 import { searchForIcon } from '@iconify/utils/lib/loader/modern'
 import type { IconsOptions } from './types'
 import icons from './collections.json'
-import { resolveQueryString } from './utils'
+import { resolveQueryParams } from './utils'
 import { scaleDuration } from './duration'
 
 const COLLECTION_NAME_PARTS_MAX = 3
@@ -72,7 +72,7 @@ export function createPresetIcons(lookupIconLoader: (options: IconsOptions) => P
         /^([a-z0-9:_-]+)(?:\?(\S*))?$/,
         async (matcher) => {
           const [full, body, queryString] = matcher as [string, string, string]
-          let { mode: _mode = mode, duration } = resolveQueryString(queryString)
+          let { mode: _mode = mode, duration } = resolveQueryParams(queryString)
           let collection = ''
           let name = ''
           let svg: string | undefined

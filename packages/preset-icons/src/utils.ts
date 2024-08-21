@@ -1,22 +1,22 @@
 import { parse } from 'node:querystring'
-import type { IconsOptions, QueryObject } from './types'
+import type { IconsOptions, QueryParams } from './types'
 
 const MODES = ['auto', 'mask', 'bg']
 
-export function resolveQueryString(queryString: string): QueryObject {
+export function resolveQueryParams(queryString: string): QueryParams {
   const queryObject = parse(queryString)
 
-  const ret: QueryObject = Object.create(null)
+  const queryParams: QueryParams = {}
 
-  ret.mode = Object.keys(queryObject).find(i => MODES.includes(i)) as IconsOptions['mode']
+  queryParams.mode = Object.keys(queryObject).find(i => MODES.includes(i)) as IconsOptions['mode']
 
-  let _duration = queryObject._duration ?? queryObject.dur
+  let _duration = queryObject.duration ?? queryObject.dur
   if (Array.isArray(_duration)) {
     _duration = _duration.pop()
   }
   if (!Number.isNaN(Number(_duration))) {
-    ret.duration = +_duration!
+    queryParams.duration = +_duration!
   }
 
-  return ret
+  return queryParams
 }
