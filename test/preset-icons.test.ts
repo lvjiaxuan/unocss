@@ -83,12 +83,14 @@ describe('preset-icons', () => {
 
   it('scale the duration to animated icon', async () => {
     const fixtures = [
+      '<button class="i-svg-spinners:12-dots-scale-rotate?dur" />',
+      '<button class="i-svg-spinners:12-dots-scale-rotate?dur=" />',
       '<button class="i-svg-spinners:12-dots-scale-rotate?dur=0" />',
       '<button class="i-svg-spinners:12-dots-scale-rotate?dur=0.5" />',
       '<button class="i-svg-spinners:12-dots-scale-rotate?dur=.25" />',
       '<button class="i-svg-spinners:12-dots-scale-rotate?duration=1.5" />',
       // with mode
-      '<button class="i-svg-spinners:12-dots-scale-rotate?dur=.2&bg" />',
+      '<button class="i-svg-spinners:12-dots-scale-rotate?bg&dur=.2" />',
       '<button class="i-svg-spinners:12-dots-scale-rotate?dur=3&auto" />',
     ]
     const { css } = await uno.generate(fixtures.join(' '), { preflights: false })
